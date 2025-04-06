@@ -1,0 +1,6 @@
+# Cache and build output
+.zig-cache
+zig-out
+
+# Binary release of Limine
+limine
