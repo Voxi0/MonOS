@@ -114,7 +114,7 @@ pub fn build(b: *std.Build) void {
 
     // Run step
     const runCmd = b.addSystemCommand(&.{
-        "qemu-system-x86_64",
+        "qemu-system-x86_64", "-drive", "format=raw,file=./zig-out/bin-x86_64/MonOS",
     });
     runCmd.step.dependOn(b.getInstallStep());
     const runStep = b.step("run", "Run program");
@@ -137,6 +137,13 @@ fn fetchDeps(b: *std.Build) void {
     }
 
     // Fetch the latest binary release of Limine 9.x
-    const fetchLimineCmd = b.addSystemCommand(&.{ "git", "clone", "https://github.com/limine-bootloader/limine.git", "--branch=v9.x-binary", "--depth=1", "limine" });
+    const fetchLimineCmd = b.addSystemCommand(&.{
+        "git",
+        "clone",
+        "https://github.com/limine-bootloader/limine.git",
+        "--branch=v9.x-binary",
+        "--depth=1",
+        "limine",
+    });
     fetchDepsStep.dependOn(&fetchLimineCmd.step);
 }
