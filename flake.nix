@@ -17,7 +17,7 @@
     };
   in with pkgs; {
     devShells.default = mkShell {
-      buildInputs = [ wget nasm qemu libisoburn ];
+      buildInputs = [ zig nasm qemu libisoburn wget ];
       shellHook = '''';
     };
   });

@@ -8,65 +8,20 @@ const PROJECT_ZIG_DEPENDENCIES = .{
     .{ .name = "limine_zig", .src = "git+https://github.com/48cf/limine-zig#trunk" },
 };
 
-// A list of architectures supported by the kernel
-const Arch = enum {
-    x86_64,
-    aarch64,
-    riscv64,
-    loongarch64,
-
-    /// Convert the architecture to `std.Target.Cpu.Arch`
-    fn toStd(self: @This()) std.Target.Cpu.Arch {
-        return switch (self) {
-            .x86_64 => .x86_64,
-            .aarch64 => .aarch64,
-            .riscv64 => .riscv64,
-            .loongarch64 => .loongarch64,
-        };
-    }
-};
-
-// Create a target query for the given architecture
-fn targetQueryForArch(arch: Arch) std.Target.Query {
-    // Create a target query
-    var targetQuery: std.Target.Query = .{
-        .cpu_arch = arch.toStd(),
-        .os_tag = .freestanding,
-        .abi = .none,
-    };
-
-    // The target needs to disable some features that are unsupported in a bare-metal environment
-    switch (arch) {
-        .x86_64 => {
-            const target = std.Target.x86;
-            targetQuery.cpu_features_add = target.featureSet(&.{ .popcnt, .soft_float });
-            targetQuery.cpu_features_sub = target.featureSet(&.{ .avx, .avx2, .sse, .sse2, .mmx });
-        },
-        .aarch64 => {
-            const target = std.Target.aarch64;
-            targetQuery.cpu_features_add = target.featureSet(&.{});
-            targetQuery.cpu_features_sub = target.featureSet(&.{ .fp_armv8, .crypto, .neon });
-        },
-        .riscv64 => {
-            const target = std.Target.riscv;
-            targetQuery.cpu_features_add = target.featureSet(&.{});
-            targetQuery.cpu_features_sub = target.featureSet(&.{.d});
-        },
-        .loongarch64 => {},
-    }
-
-    // Return the target query
-    return targetQuery;
-}
-
 // Declaratively construct a build graph to be executed by an external runner
 pub fn build(b: *std.Build) void {
     // Options
-    const architecture = b.option(Arch, "arch", "Architecture to build MonOS for") orelse .x86_64;
+    const architecture = b.option(std.Target.Cpu.Arch, "arch", "Architecture to build MonOS for") orelse std.Target.Cpu.Arch.x86_64;
 
     // Resolve which target/architecture to build for
     // Allow optimization mode to be specified when running `zig build`
-    const target = b.resolveTargetQuery(targetQueryForArch(architecture));
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = architecture,
+        .os_tag = .freestanding,
+        .abi = .none,
+        .cpu_features_add = std.Target.x86.featureSet(&.{.popcnt, .soft_float}),
+        .cpu_features_sub = std.Target.x86.featureSet(&.{.avx, .avx2, .sse, .sse2, .mmx}),
+    });
     const optimize = b.standardOptimizeOption(.{});
 
     // Dependencies
@@ -87,13 +42,8 @@ pub fn build(b: *std.Build) void {
     });
 
     // Specify the code model and other target-specific options
-    switch (architecture) {
-        .x86_64 => {
-            kernelMod.red_zone = false;
-            kernelMod.code_model = .kernel;
-        },
-        .aarch64, .riscv64, .loongarch64 => {},
-    }
+    kernelMod.red_zone = false;
+    kernelMod.code_model = .kernel;
 
     // A build step to build an executable
     const kernel = b.addExecutable(.{
@@ -114,7 +64,7 @@ pub fn build(b: *std.Build) void {
 
     // Run step
     const runCmd = b.addSystemCommand(&.{
-        "qemu-system-x86_64", "-drive", "format=raw,file=./zig-out/bin-x86_64/MonOS",
+        "qemu-system-x86_64", "-drive", b.fmt("format=raw,file=./zig-out/bin-{s}/{s}", .{@tagName(architecture), PROJECT_NAME}),
     });
     runCmd.step.dependOn(b.getInstallStep());
     const runStep = b.step("run", "Run program");

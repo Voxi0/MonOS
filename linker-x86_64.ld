@@ -2,7 +2,7 @@
 OUTPUT_FORMAT(elf64-x86-64)
 
 /* OS entry point */
-ENTRY(kmain)
+ENTRY(_start)
 
 /* Define the program headers we want so the bootloader gives us the right MMU permissions */
 /* This also allows us to exert more control over the linking process. */
